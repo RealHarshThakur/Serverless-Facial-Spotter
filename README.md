@@ -1,2 +1,2 @@
 # Serverless-Facial-Spotter
-Facial attendance system built entirely on serverless stack. 
+Facial spotter built entirely on serverless stack. 
