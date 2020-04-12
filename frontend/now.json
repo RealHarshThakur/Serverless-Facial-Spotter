@@ -8,8 +8,8 @@
     ],
     "build": {
       "env": {
-        "AUTH0_DOMAIN": "harshthakur.auth0.com",
-        "AUTH0_CLIENT_ID": "Enter your api key here or pick it from the environment"
+        "AUTH0_DOMAIN": "@auth0-domain",
+        "AUTH0_CLIENT_ID": "@auth0-client-id"
       }
     }
   }

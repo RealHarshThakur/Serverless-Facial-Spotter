@@ -25,7 +25,11 @@
 </template>
 
 <script>
+import { mapGetters } from 'vuex'
+
 export default {
+
+
   data () {
     return {
       clipped: false,
@@ -48,6 +52,8 @@ export default {
       rightDrawer: false,
       title: 'Vuetify.js'
     }
-  }
+  },
+  computed: mapGetters(['isAuthenticated'])
+
 }
 </script>
