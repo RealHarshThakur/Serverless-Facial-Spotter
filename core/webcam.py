@@ -1,45 +1,38 @@
 import face_recognition
-import cv2
-import numpy as np
 from flask import Flask, jsonify, request, redirect, make_response
-from flask_restplus import Api, Namespace, Resource, reqparse
-from werkzeug.utils import cached_property
-from werkzeug.datastructures import FileStorage
-from werkzeug.middleware.dispatcher import DispatcherMiddleware
 import logging, sys, time
 import functools
+import cv2
+import numpy as np
 
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
-logging.basicConfig(stream=sys.stderr, level=logging.INFO)
 app = Flask(__name__)
-api = Api()
-api.init_app(app)
 
+# curl -XPOST -F "file=@ " http://127.0.0.1:5000
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+@app.route('/upload', methods=['POST'])
+def upload_image():
+    if request.method == 'POST':
+        if 'file' not in request.files:
+            return make_response(jsonify("Msg: Upload an image"),415)
 
-upload_ns = Namespace('upload')
-api.add_namespace(upload_ns)
+        file = request.files['file']
 
-image_parser = upload_ns.parser()
-image_parser.add_argument('image',type=FileStorage,location='files',required=True,help='Image of a person')
+        if file.filename == '':
+            return make_response(jsonify("Msg: Upload an image"),415)
 
-ALLOWED_EXTENSIONS = {'image/png', 'image/jpg', 'image/jpeg', 'image/gif'}
-
-
-@upload_ns.route('/')
-class upload(Resource):
-    @api.expect(image_parser,validate=True)       
-    def post(self):
-        args =  image_parser.parse_args()
-        if args['image'] and args['image'].mimetype in ALLOWED_EXTENSIONS:
-            # Could start checking if it's really an image based of the file header. See any security issues?
-            found = detect_faces(args['image'].stream)
+        if file and allowed_file(file.filename):
+            found = detect_faces(file)
             if found:
                 return make_response(jsonify("Msg: Person Found"),200)
             else:
                 return make_response(jsonify("Msg: Person not found"),417)
-        else: 
-            return make_response(jsonify("Msg: Upload an image"),415)
+
+
 
 
 
@@ -127,5 +120,3 @@ def detect_faces(file_stream):
 
     video_capture.release()
     cv2.destroyAllWindows()
-
-
