@@ -39,6 +39,13 @@ def lambda_handler(event, context):
         newName = user_input+str(res)
         return newName 
     
+    def countObject():
+        conn = S3Connection('access-key','secret-access-key')
+        bucket = conn.get_bucket('bucket')
+        for key in bucket.list():
+            if (key.name)[-3] == "png":
+                return False
+
     response = {
         "statusCode": 200,
         "body": json.dumps(response1)
