@@ -1,24 +1,23 @@
 import json
+from flask import Flask, jsonify, request, redirect, make_response
 import boto3
 import os
 import sys
 import uuid
 from urllib.parse import unquote_plus
-from PIL import Image
-import PIL.Image
 import random
 import string
 from boto.s3.connection import S3Connection
 
 s3_client = boto3.client('s3')
-
+app=Flask(__name__)
+ctr=0
 buck_name=''
 response1=''
 def lambda_handler(event, context):
     namee=bucket_name(buck_name)
-    noImages=countObject()
-
-    delete=deleteAll()
+    countObject()
+    deleteAll()
     response1 = s3_client.create_bucket(
     ACL='public',
     Bucket=namee,
@@ -39,17 +38,26 @@ def lambda_handler(event, context):
         newName = user_input+str(res)
         return newName 
     
+    @app.route('/deleteAll', methods='[POST]')
     def deleteAll():
         s3 = boto3.resource('s3')
         bucket=s3.Bucket(buck_name)
-        bucket.objects.all().delete()
-        return 1
+        if "No Item to delete" in bucket.objects.all().delete():
+            return make_response(jsonify("Msg: You already have no pics dude"), 411)
+        else:
+            return make_response(jsonify("Msg: Successfully deleted all your pics"), 200)
+
+    @app.route('/countObject', methods='[GET]')
     def countObject():
         conn = S3Connection('access-key','secret-access-key')
         bucket = conn.get_bucket('bucket')
         for key in bucket.list():
-            if (key.name)[-3] == "png":
-                return False
+            if str(key.name)[-3] == "png" | str(key.name)[-3] == "bmp" | str(key.name)[-3] == "jpg" | str(key.name)[-3] == "gif":
+                ctr=ctr+1;    
+        if ctr == 0:
+            return make_response(jsonify("Msg: Your bucket is empty dude"), 200)
+        else:
+            return make_response(jsonify("Msg: Total no of objects are "+ctr), 200)
 
     response = {
         "statusCode": 200,
