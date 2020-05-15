@@ -5,6 +5,9 @@ import numpy as np
 import os, re
 from werkzeug.datastructures import ImmutableMultiDict
 import face_recognition
+import json
+from google.cloud import firestore
+from datetime import date
 
 # Intializion code. Also reduces cold start time 
 logging.basicConfig(level=logging.INFO)
@@ -18,8 +21,7 @@ app = Flask(__name__)
 
 
 # This functions checks for image file extensions 
-# curl -XPOST -F "file=@.jpeg "  -F url='https://' http://localhost:5000/upload
-
+# curl -XPOST -F "file=@harsh.jpeg "  -F 'data={"url":"","time":"20","email":""}' http://localhost:5000/upload 
 def allowed_file(filename):
     """
     params:
@@ -34,15 +36,22 @@ def upload_image():
     This path takes two inputs in multiform/data.
     Name of paramaters:
     file: Image of the user
-    url: This should be in json . Ex: {'url':'http://..'}
-
+    url: Url of the video
+    email: To add date to database
+    time: Number of seconds to look for that person. Max: 5mins, can be configured to 15mins on cloud run 
     """
     if request.method == 'POST':
         if 'file' not in request.files:
             return make_response(jsonify("Msg: Upload an image"),415)
 
-        url= dict(request.form)
-        test_url = re.search("^http|https|rstp", url['url'])
+
+        data= json.loads(request.form["data"])
+        if data["time"]:
+            if type(int(data["time"]))!=type(3):
+                return make_response(jsonify("Msg: Time should be an integer"))
+            if int(data["time"])>300:
+                return make_response(jsonify("Msg: Time cannot be more than 300 seconds"))
+        test_url = re.search("^http|https|rstp", data["url"])
         if test_url:
             file = request.files['file']
 
@@ -50,13 +59,24 @@ def upload_image():
                 return make_response(jsonify("Msg: Upload an image"),415)
 
             if file and allowed_file(file.filename):
-                found = detect_faces(file,url)
+                found = detect_faces(file,data)
                 if found:
+                    datetoDB(data["email"])
                     return make_response(jsonify("Msg: Person Found"),200)
                 else:
                     return make_response(jsonify("Msg: Person not found"),417)
         else:
             return make_response(jsonify("Msg: Invalid url"), 415)
+
+# Adds dates to DB in form of a list
+def datetoDB(email):
+    db = firestore.Client()
+    doc_ref = db.collection(u'users').document(email)
+
+    today = date.today().strftime("%d/%m/%Y")
+    doc_ref.set({u'date': str(today) }, merge=True)
+    logger.info("Date added")    
+
 
 @app.route('/compare', methods=['POST'])
 def compare():
@@ -125,28 +145,25 @@ def check():
 
    
 # Detects a face, returns boolean
-def detect_faces(file_stream, url):
+def detect_faces(file_stream, data):
 
     """
     params:
     - file_stream: Image served as binary stream
-    - url: Url for video source
+    - data: Url for video source
     """
     logger.debug("Into detect faces function")
     start_time = time.perf_counter()
-    logger.info(url['url'])
+    logger.info(data['url'])
     for i in range(5):
         try: 
-            video_capture = cv2.VideoCapture(url['url']) 
+            video_capture = cv2.VideoCapture(data['url']) 
         except:
             if i > 5:
                 return False
             else:
                 logger.debug("retrying to fetch the video")
               
-
-
-
     try:
         logger.debug("Loading image file")
         person_tobe_found = face_recognition.load_image_file(file_stream)
@@ -156,7 +173,7 @@ def detect_faces(file_stream, url):
             person_tbf_encoding
         ]
         known_face_names = [
-            "Person"
+            data["email"]
         ]
 
         face_locations = []
@@ -193,7 +210,7 @@ def detect_faces(file_stream, url):
                     
                     face_names.append(name)
                     logger.debug(face_names)
-                    if 'Person' in face_names:
+                    if data["email"] in face_names:
                         logger.info("Actually found the person")
                         return True
         except:
@@ -203,8 +220,8 @@ def detect_faces(file_stream, url):
 
         end_time = time.perf_counter()
         run_time = end_time - start_time
-        
-        if run_time > 20: # No. of seconds we look for that person 
+        look_time = int(data["time"])
+        if run_time > look_time: # No. of seconds we look for that person 
             return False
 
     video_capture.release()
