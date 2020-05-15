@@ -12,6 +12,9 @@ After a user creates a profile on the website, they can provide a video source l
 - Images are stored on Google Cloud Storage
 - Firestore is used for storing dates and bucket names associated with the profile
 
+# Work in Progress 
+- Pub/Sub for eventing
+- Frontend
 
 # Additional features
 - Compare how similar two faces are. 
