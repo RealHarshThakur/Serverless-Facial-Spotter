@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"time"
 
+	"cloud.google.com/go/firestore"
 	"cloud.google.com/go/storage"
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/gorilla/mux"
@@ -25,8 +26,10 @@ const letterBytes = "abcdefghijklmnopqrstuvwxyz"
 // Username defines name of the user
 type Username struct {
 	Username string `json:"username" validate:"required"`
+	Email    string `json:"email" validate:"required"`
 }
 
+// Message defines message to encode
 type Message struct {
 	Message string `json:"message"`
 }
@@ -45,26 +48,17 @@ func randStringBytes(n int) string {
 
 func createBucket(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
-	// creds, err := google.FindDefaultCredentials(ctx, storage.ScopeReadOnly)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-
 	client, err := storage.NewClient(ctx)
-
 	if err != nil {
-
 		http.Error(w, " Issue with connecting to storage", http.StatusInternalServerError)
 		log.Fatal(err)
 		return
-
 	}
 
 	var u Username
 	decoder := json.NewDecoder(r.Body)
 	err = decoder.Decode(&u)
 	if err != nil {
-
 		http.Error(w, " Invalid data", http.StatusPreconditionFailed)
 		return
 	}
@@ -88,7 +82,25 @@ func createBucket(w http.ResponseWriter, r *http.Request) {
 	var m Message
 	m.Message = "Created the bucket: " + bucketname
 	json.NewEncoder(w).Encode(m)
+	addBucketName(u.Email, bucketname)
+}
 
+func addBucketName(e string, bucketname string) {
+	projectID := "steady-service-269616"
+	ctx := context.Background()
+	client, err := firestore.NewClient(ctx, projectID)
+	if err != nil {
+		log.Fatalf("Failed to create client: %v", err)
+	}
+	defer client.Close()
+	_, err = client.Collection("users").Doc(e).Set(ctx, map[string]string{
+		"Bucket": bucketname,
+	}, firestore.MergeAll)
+	if err != nil {
+		// Handle any errors in an appropriate way, such as returning them.
+		log.Printf("An error has occurred: %s", err)
+	}
+	log.Println("Firestore updated")
 }
 
 func countobject(bucketname string) int {
