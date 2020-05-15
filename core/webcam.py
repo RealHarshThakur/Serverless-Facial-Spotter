@@ -7,7 +7,7 @@ from werkzeug.datastructures import ImmutableMultiDict
 import face_recognition
 
 # Intializion code. Also reduces cold start time 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
 
 
@@ -58,9 +58,72 @@ def upload_image():
         else:
             return make_response(jsonify("Msg: Invalid url"), 415)
 
+@app.route('/compare', methods=['POST'])
+def compare():
+    """
+    This path takes two inputs in multiform/data
+    Name of paramaters:
+    image1: First image
+    image2 : Second image
+    """
+    if request.method == 'POST':
+        if 'image1' not in request.files or 'image2' not in request.files:
+            return make_response(jsonify("Msg: Upload an image"),415)
+
+        image1 = request.files['image1']
+        image2 = request.files['image2']
+        if image1.filename == '' or image2.filename == '':
+            return make_response(jsonify("Msg: Upload an image"),415)
+
+        if image1 and allowed_file(image1.filename):
+            if image2 and allowed_file(image2.filename):
+                load_image1 = face_recognition.load_image_file(image1)
+                load_image2 = face_recognition.load_image_file(image2)
+
+                face1_encoding = face_recognition.face_encodings(load_image1)[0]
+                face2_encoding = face_recognition.face_encodings(load_image2)[0]
+
+                face_distances = face_recognition.face_distance([face1_encoding], face2_encoding)
+                complement = 1 - face_distances
+                percent = complement*100
+                msg = "The faces are "+str(percent)+ " percent alike"
+                return make_response(jsonify(msg), 200)
+            else:
+                return make_response(jsonify("Msg:upload an image"),415)
+        else:
+            return make_response(jsonify("Msg:upload an image"),415)
+    else: 
+            return make_response(jsonify("Invalid request ", 403))
 
 
+@app.route('/check', methods=['POST'])
+def check():
+    """
+    This function checks the number of faces in an image 
+    Name of paramaters:
+    image: First image
+    """
+    if request.method == 'POST':
+        logger.debug("Post request")
+        if 'image' not in request.files :
+            logger.debug("No file or wrong parameter name")
+            return make_response(jsonify("Msg: Upload an image"),415)
 
+        image = request.files['image']
+        if image.filename == '' :
+            logger.debug("No file  ")
+            return make_response(jsonify("Msg: Upload an image"),415)
+
+        if image and allowed_file(image.filename):
+            load_image = face_recognition.load_image_file(image)
+            face_no = face_recognition.face_locations(load_image)
+
+            if len(face_no)>1:
+                return make_response(jsonify("Please upload a pic with only one person in it"), 415)
+            
+            return make_response(jsonify("Great! Pic has only one person in it"), 200)
+
+   
 # Detects a face, returns boolean
 def detect_faces(file_stream, url):
 
